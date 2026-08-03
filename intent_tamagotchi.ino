@@ -34,9 +34,9 @@ bool lastB3 = HIGH;
 bool started = false;
 bool sleeping = false;
 
-bool walkRight = true;
 int walkPos = 0;
 int walkXPos = 0;
+bool toRight = true;
 bool frontFace = true;
 
 int grassXPos = 0;
@@ -48,6 +48,10 @@ float discipline = 100;
 float weight = 1;
 float age = 0;
 float poopometer = 0;
+
+
+unsigned long lastWalkTime = 0;
+const long INTERVAL_WALK = 3000;
 
 bool dead = false;
 int poops[3] = {
@@ -643,14 +647,22 @@ const unsigned char epd_bitmap_apple[] PROGMEM = {
 	0x7f, 0xfe, 0x7f, 0xfe, 0x7f, 0xfe, 0x3f, 0xfc, 0x3f, 0xfc, 0x1f, 0xf8, 0x07, 0xe0, 0x00, 0x00
 };
 
+// 'sleep', 16x16px
+const unsigned char epd_bitmap_sleep [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x0e, 0x00, 0x02, 0x00, 0x04, 0x00, 0x0e, 0x00, 0xe0, 0x00, 0x20, 0x00, 0x40, 
+	0x00, 0xe0, 0x1f, 0x00, 0x20, 0x80, 0x3b, 0x80, 0x20, 0x80, 0x20, 0x80, 0x1f, 0x00, 0x00, 0x00
+};
+
 // Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 192)
-const int epd_bitmap_allArray_icons_menu_LEN = 4;
+const int epd_bitmap_allArray_icons_menu_LEN = 5;
 const unsigned char* epd_bitmap_menu_icons[epd_bitmap_allArray_icons_menu_LEN] = {
 	epd_bitmap_exit,
 	epd_bitmap_apple,
 	epd_bitmap_candy,
-	epd_bitmap_chicken_leg
+	epd_bitmap_chicken_leg,
+	epd_bitmap_sleep
 };
+
 
 #pragma endregion
 
@@ -1156,25 +1168,6 @@ void showNecesities(int index) {
 }
 
 void updateState() {
-	// char message[100];
-
-	// snprintf(message, sizeof(message), "Edad: %d", age);
-	// Serial.println(message);
-
-	// snprintf(message, sizeof(message), "Hambre: %.2f", hunger);
-	// Serial.println(message);
-
-	// snprintf(message, sizeof(message), "Felicidad: %.2f", happiness);
-	// Serial.println(message);
-
-	// snprintf(message, sizeof(message), "Vida: %.2f", health);
-	// Serial.println(message);
-
-	// snprintf(message, sizeof(message), "Disciplina: %.2f", discipline);
-	// Serial.println(message);
-
-	// snprintf(message, sizeof(message), "Caca: %.4f", poopometer);
-	// Serial.println(message);
 	age += 0.0000025;
 	if (hunger <= 0 || health <= 0 || happiness <= 0) {
 		dead = true;
@@ -1204,7 +1197,7 @@ void updateState() {
 	}
 }
 
-void checkState() {
+void drawNecesity() {
 	if (hunger < 50.00025) {
 		showNecesities(2);
 	}
@@ -1237,8 +1230,6 @@ void checkButtons(long currentMillis, bool pressed1, bool pressed2, bool pressed
 	}
 
 	if (isMenuActive) {
-		Serial.println("menu");
-		Serial.println(menuItem);
 		if (pressed1) {
 			menuItem -= 1;
 			if (menuItem <= -1) {
@@ -1252,7 +1243,10 @@ void checkButtons(long currentMillis, bool pressed1, bool pressed2, bool pressed
 			}
 		}
 		if (pressed2 && menuItem == 0) {
+			menuItem = 1;
 			isMenuActive = false;
+			shouldApply = false;
+			menuButtonPressed = false;
 			return;
 		}
 		if (pressed2 && menuButtonPressed) {
@@ -1305,10 +1299,40 @@ void backgroundDraw() {
 	for (int i = 0; i < 2 * display.width() / 16; i++) {
 		display.drawBitmap(-grassXPos + i * 32, 0, epd_bitmap_background_capa_1, 128, 64, WHITE);
 	}
-	checkState();
 }
 
-void animationPetState(long currentMillis, bool pressed1) {
+void sleepingDraw() {
+	display.setCursor(walkXPos,36);
+	display.print(F("Z"));
+	display.setCursor(walkXPos,33);
+	display.print(F("z"));
+}
+
+void walkDrawAndMovement() {
+	if (sleeping) {
+		return;
+	}
+	const unsigned char** stepToDraw;
+	if (toRight) {
+		walkXPos += 1;
+		grassXPos += 2;
+		if(walkXPos >= 112){
+			toRight = false;
+		}
+		stepToDraw = epd_bitmap_allArray;
+	} else {
+		walkXPos -= 1;
+		grassXPos -= 2;
+		if(walkXPos <= 0){
+			toRight = true;
+		}
+		stepToDraw = epd_bitmap_allArray_reversed;
+	}
+	display.drawBitmap(walkXPos, centerY - 2, stepToDraw[walkPos], 20, 16, WHITE);
+	walkPos += 1;
+}
+
+void animationPetState(unsigned long currentMillis, bool pressed1) {
 	if (isMenuActive) {
 		return;
 	}
@@ -1327,7 +1351,8 @@ void animationPetState(long currentMillis, bool pressed1) {
 		walkPos = 0;
 	}
 
-	if (currentMillis % 3000 == 0) {
+	if (currentMillis - lastWalkTime >= INTERVAL_WALK) {
+		lastWalkTime = currentMillis;
 		frontFace = !frontFace;
 	}
 
@@ -1336,27 +1361,8 @@ void animationPetState(long currentMillis, bool pressed1) {
 		display.display();
 		return;
 	}
-
-	if (walkRight) {
-		if (!sleeping) {
-			walkXPos += 1;
-			grassXPos += 2;
-		}
-		if (walkXPos > 112) {
-			walkRight = false;
-		}
-		display.drawBitmap(walkXPos, centerY - 2, epd_bitmap_allArray[walkPos], 20, 16, WHITE);
-	} else {
-		if (!sleeping) {
-			walkXPos -= 1;
-			grassXPos -= 2;
-		}
-		if (walkXPos < 0) {
-			walkRight = true;
-		}
-		display.drawBitmap(walkXPos, centerY - 2, epd_bitmap_allArray_reversed[walkPos], 20, 16, WHITE);
-	}
-	walkPos += 1;
+	sleepingDraw();
+	walkDrawAndMovement();
 	display.display();
 }
 
@@ -1389,7 +1395,9 @@ void actionMenu() {
 			health += 10;
 			hunger += 20;
 		}
+		menuItem = 1;
 		shouldApply = false;
+		menuButtonPressed = false;
 		isMenuActive = false;
 	}
 	drawMenu();
@@ -1441,7 +1449,7 @@ void loop() {
 	}
 
 	updateState();
-
+	drawNecesity();
 	actionMenu();
 	animationPetState(currentMillis, pressed1);
 }

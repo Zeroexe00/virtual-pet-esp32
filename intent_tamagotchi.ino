@@ -56,6 +56,10 @@ float poopometer = 0;
 unsigned long lastWalkTime = 0;
 const long INTERVAL_WALK = 3000;
 
+unsigned long lastSleepPosTime = 0;
+unsigned long lastSleepPosIndex = 0;
+const long INTEVAL_CHANGE_SLEEP_POS = 3000;
+
 bool dead = false;
 int poops[3] = {
 	0,
@@ -401,6 +405,33 @@ const unsigned char* epd_bitmap_allArray_reversed[epd_bitmap_allArray_reversed_L
 	epd_bitmap_pet_stage_1_walkv2_r0004
 };
 
+// 'pet-stage-1-sleep0002', 20x16px
+const unsigned char epd_bitmap_pet_stage_1_sleep0002 [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 
+	0xc0, 0x00, 0x38, 0x38, 0x00, 0x20, 0x08, 0x00, 0x16, 0xd7, 0xc0, 0x10, 0x00, 0x40, 0x11, 0x00, 
+	0x40, 0x10, 0x00, 0x40, 0x10, 0x00, 0x40, 0x11, 0x02, 0x40, 0x0f, 0xff, 0x80, 0x00, 0x00, 0x00
+};
+// 'pet-stage-1-sleep0000', 20x16px
+const unsigned char epd_bitmap_pet_stage_1_sleep0000 [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 
+	0xc0, 0x00, 0x38, 0x38, 0x00, 0x20, 0x08, 0x00, 0x16, 0xd7, 0xc0, 0x10, 0x00, 0x40, 0x11, 0x00, 
+	0x40, 0x10, 0x00, 0x40, 0x10, 0x00, 0x40, 0x11, 0x02, 0x40, 0x0f, 0xff, 0x80, 0x00, 0x00, 0x00
+};
+// 'pet-stage-1-sleep0001', 20x16px
+const unsigned char epd_bitmap_pet_stage_1_sleep0001 [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0xc0, 0x00, 0x38, 
+	0x38, 0x00, 0x20, 0x08, 0x00, 0x16, 0xd0, 0x00, 0x10, 0x0f, 0x80, 0x11, 0x00, 0x40, 0x10, 0x00, 
+	0x40, 0x10, 0x00, 0x40, 0x10, 0x00, 0x40, 0x11, 0x02, 0x40, 0x0f, 0xff, 0x80, 0x00, 0x00, 0x00
+};
+
+// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 192)
+const int epd_bitmap_sleep_LEN = 3;
+const unsigned char* epd_bitmap_sleep[epd_bitmap_sleep_LEN] = {
+	epd_bitmap_pet_stage_1_sleep0000,
+	epd_bitmap_pet_stage_1_sleep0001,
+	epd_bitmap_pet_stage_1_sleep0002
+};
+
 // 'background-front', 128x5px
 const unsigned char epd_bitmap_background_front[] PROGMEM = {
 	0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x80,
@@ -537,7 +568,7 @@ const unsigned char epd_bitmap_apple[] PROGMEM = {
 };
 
 // 'sleep', 32x32px
-const unsigned char epd_bitmap_sleep[] PROGMEM = {
+const unsigned char epd_bitmap_sleep_icon[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x04,
 	0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x03, 0xc0, 0x00, 0x00, 0x00, 0x40,
 	0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0xc0, 0x00, 0x00, 0x78, 0x00,
@@ -548,15 +579,28 @@ const unsigned char epd_bitmap_sleep[] PROGMEM = {
 	0x08, 0x04, 0x00, 0x00, 0x06, 0x18, 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+// 'petting', 32x32px
+const unsigned char epd_bitmap_petting [] PROGMEM = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd8, 0x00, 0x00, 0x01, 0x24, 0x00, 0x00, 
+	0x00, 0x88, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x06, 0xc0, 0x20, 
+	0x00, 0x09, 0x20, 0x40, 0x00, 0x04, 0x40, 0x80, 0x00, 0x02, 0x81, 0x00, 0x00, 0x01, 0x02, 0x00, 
+	0x00, 0xd8, 0x04, 0x00, 0x01, 0x24, 0x08, 0x20, 0x00, 0x88, 0x10, 0x40, 0x00, 0x50, 0x20, 0x80, 
+	0x00, 0x20, 0x41, 0x00, 0x00, 0x03, 0xc2, 0x00, 0x00, 0x1c, 0x04, 0x00, 0x00, 0x20, 0x08, 0x00, 
+	0x00, 0x10, 0x18, 0x00, 0x01, 0xff, 0xff, 0x80, 0x01, 0x20, 0x04, 0x80, 0x00, 0xa0, 0x05, 0x00, 
+	0x00, 0x6a, 0x56, 0x00, 0x00, 0x24, 0x24, 0x00, 0x00, 0x20, 0x04, 0x00, 0x00, 0x22, 0x44, 0x00, 
+	0x00, 0x31, 0x8c, 0x00, 0x00, 0x1c, 0x38, 0x00, 0x00, 0x03, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
 // Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 192)
-const int epd_bitmap_allArray_icons_menu_LEN = 6;
+const int epd_bitmap_allArray_icons_menu_LEN = 7;
 const unsigned char* epd_bitmap_menu_icons[epd_bitmap_allArray_icons_menu_LEN] = {
 	epd_bitmap_exit,
 	epd_bitmap_apple,
 	epd_bitmap_candy,
 	epd_bitmap_drumstick,
-	epd_bitmap_sleep,
-	epd_bitmap_broom
+	epd_bitmap_sleep_icon,
+	epd_bitmap_broom,
+	epd_bitmap_petting
 };
 
 
@@ -869,9 +913,13 @@ void soTheme() {
 }
 
 void updateState() {
+	if (dead) {
+		return;
+	}
 	age += 0.0000025;
 	if (hunger <= 0.00001 || health <= 0.00001) {
 		dead = true;
+		return;
 	}
 	if (discipline - 0.0001 > 0) {
 		discipline -= 0.0001;
@@ -893,7 +941,9 @@ void updateState() {
 	health -= 0.0001 + countPoops() * 0.0001;
 	if (poopometer >= 10) {
 		poopometer = countPoops();
-		poops[(int)round(poopometer)] = random(20, display.width() + 32);
+		if (poopometer < 3) {
+			poops[(int)round(poopometer)] = random(20, display.width() + 32);
+		}
 		poopometer = 0;
 	}
 }
@@ -906,9 +956,6 @@ void drawStatuses() {
 	long mappedHunger = map(hunger, 0, 100, 0, 10);
 	long mappedHappiness = map(happiness, 0, 100, 0, 10);
 	long mappedHealth = map(health, 0, 100, 0, 10);
-	Serial.println(mappedHunger);
-	Serial.println(mappedHappiness);
-	Serial.println(mappedHealth);
 	display.drawBitmap(0, 0, icons[0], 16, 16, WHITE);
 	display.drawRect(barXPosition, 0, 10, barYSize, WHITE);
 	display.fillRect(barXPosition, 0, mappedHappiness, barYSize, WHITE);
@@ -930,6 +977,9 @@ void checkButtons(long currentMillis, bool pressed1, bool pressed2, bool pressed
 		weight = 1;
 		age = 0;
 		poopometer = 0;
+		for (int i = 0; i < 3; i++) {
+			poops[i] = 0;
+		}
 	}
 
 	if (sequenceStep != 0 && currentMillis - lastButtonPressed > TIMEOUT) {
@@ -949,7 +999,7 @@ void checkButtons(long currentMillis, bool pressed1, bool pressed2, bool pressed
 		}
 		if (pressed3) {
 			menuItem += 1;
-			if (menuItem >= 6) {
+			if (menuItem >= epd_bitmap_allArray_icons_menu_LEN) {
 				menuItem = 0;
 			}
 		}
@@ -1035,6 +1085,14 @@ void sleepingDraw(unsigned long currentMillis) {
 		display.setCursor(walkXPos, 48);
 		display.print(F("z"));
 	}
+	if (currentMillis - lastSleepPosTime >= INTEVAL_CHANGE_SLEEP_POS) {
+		lastSleepPosTime = currentMillis;
+		lastSleepPosIndex += 1;
+		if (lastSleepPosIndex >= 3) {
+			lastSleepPosIndex = 0;
+		}
+	}
+	display.drawBitmap(walkXPos, 49, epd_bitmap_sleep[lastSleepPosIndex], 20, 16, WHITE);
 }
 
 void walkDrawAndMovement() {
@@ -1088,7 +1146,7 @@ void animationPetState(unsigned long currentMillis, bool pressed1) {
 	if (sleeping) {
 		sleepingDraw(currentMillis);
 	}
-	if (frontFace) {
+	if (frontFace && !sleeping) {
 		display.drawBitmap(walkXPos, 49, epd_bitmap_pet_stage_1_happy, 20, 16, WHITE);
 		display.display();
 		return;
@@ -1115,16 +1173,28 @@ void actionMenu(unsigned long currentMillis) {
 	}
 	if (shouldApply) {
 		if (menuItem == 1) {
-			health += 10;
-			hunger += 15;
+			if (health < 100) {
+				health += 10;
+			}
+			if(hunger < 100) {
+				hunger += 15;
+			}
 		}
 		if (menuItem == 2) {
-			health -= 2;
-			hunger += 10;
+			if (health < 100 && health >= 10) {
+				health -= 0.05;
+			}
+			if(hunger < 100) {
+				hunger += 10;
+			}
 		}
 		if (menuItem == 3) {
-			health += 10;
-			hunger += 20;
+			if (health < 100) {
+				health += 10;
+			}
+			if(hunger < 100) {
+				hunger += 20;
+			}
 		}
 		if (menuItem == 4) {
 			sleeping = !sleeping;
@@ -1133,6 +1203,14 @@ void actionMenu(unsigned long currentMillis) {
 			poops[0] = 0;
 			poops[1] = 0;
 			poops[2] = 0;
+		}
+		if (menuItem == 6) {
+			if(happiness < 100) {
+				happiness += 20;
+			}
+			if (health < 100) {
+				health += 0.05;
+			}
 		}
 		menuItem = 1;
 		shouldApply = false;
